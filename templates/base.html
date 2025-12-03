@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Đại Ca Đã Vào Hang!{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-btn">Home</a>
+        <a href="/chat" class="nav-btn">Chat</a>
+        <a href="/data-loader" class="nav-btn">Upload MD</a>
+        <a href="/vector-manager" class="nav-btn">Vector Store</a>
+        <a href="/config" class="nav-btn">Config</a>
+        <a href="/history" class="nav-btn history">Lịch Sử Chat</a>
+    </nav>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
