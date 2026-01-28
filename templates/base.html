@@ -3,22 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Đại Ca Đã Vào Hang!{% endblock %}</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>{% block title %}Trợ lý ảo Hidemium{% endblock %}</title>
+
+    <!-- cache bust -->
+    <link rel="stylesheet" href="/static/style.css?v=2025">
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar">
+
+<!-- ================= NAVBAR (DESKTOP / TABLET) ================= -->
+<nav class="navbar">
+    <div class="nav-left">
+        <a href="/" class="nav-logo">Hidemium</a>
+    </div>
+
+    <div class="nav-links">
         <a href="/" class="nav-btn">Home</a>
         <a href="/chat" class="nav-btn">Chat</a>
-        <a href="/data-loader" class="nav-btn">Upload MD</a>
-        <a href="/vector-manager" class="nav-btn">Vector Store</a>
+        <a href="/data-loader" class="nav-btn">Upload</a>
+        <a href="/vector-manager" class="nav-btn">Vector</a>
         <a href="/config" class="nav-btn">Config</a>
-        <a href="/history" class="nav-btn history">Lịch Sử Chat</a>
-    </nav>
+        <a href="/history" class="nav-btn history">History</a>
 
-    <main>
-        {% block content %}{% endblock %}
-    </main>
+        <button class="nav-btn theme-btn theme-toggle" title="Đổi giao diện">🌙</button>
+
+    </div>
+</nav>
+
+<!-- ================= PAGE CONTENT ================= -->
+<main>
+    {% block content %}{% endblock %}
+</main>
+
+<!-- ================= MOBILE BOTTOM NAV ================= -->
+<div class="mobile-bottom-nav">
+    <a href="/" class="{% if request.path == '/' %}active{% endif %}">
+        <span>🏠</span>Home
+    </a>
+    <a href="/chat" class="{% if '/chat' in request.path %}active{% endif %}">
+        <span>💬</span>Chat
+    </a>
+    <a href="/data-loader" class="{% if '/data-loader' in request.path %}active{% endif %}">
+        <span>📄</span>Upload
+    </a>
+    <a href="/history" class="{% if '/history' in request.path %}active{% endif %}">
+        <span>📜</span>History
+    </a>
+    <button class="nav-btn theme-btn theme-toggle" title="Đổi giao diện">🌙</button>
+
+</div>
+
+<script>
+const body = document.body;
+const themeToggles = document.querySelectorAll(".theme-toggle");
+
+// Load theme đã lưu
+const savedTheme = localStorage.getItem("theme");
+if (savedTheme === "light") {
+    body.classList.add("light");
+    themeToggles.forEach(btn => btn.textContent = "☀️");
+}
+
+// Gắn sự kiện cho TẤT CẢ nút toggle
+themeToggles.forEach(button => {
+    button.addEventListener("click", () => {
+        body.classList.toggle("light");
+        const isLight = body.classList.contains("light");
+
+        themeToggles.forEach(btn => {
+            btn.textContent = isLight ? "☀️" : "🌙";
+        });
+
+        localStorage.setItem("theme", isLight ? "light" : "dark");
+    });
+});
+</script>
+
 </body>
 </html>

@@ -16,6 +16,12 @@
   width: 70px !important;
 }
 
+.input-box:focus {
+  border-color: color-mix(in srgb, currentColor 30%, transparent);
+  outline: none;
+}
+
+
 .CodeMirror-linenumber {
   color: #8b949e !important;
   font-weight: 600;

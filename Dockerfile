@@ -1,17 +1,31 @@
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1
+FROM python:3.11-slim-bookworm
 
+# Cài compiler nhẹ, tránh các gói nặng
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ make libgomp1 curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean && apt-get autoremove -y
+
+# Tạo user không phải root
+RUN useradd -m -s /bin/bash appuser
 WORKDIR /app
+RUN chown appuser:appuser /app
+USER appuser
 
-# Copy requirements trước để tận dụng cache
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PATH="/home/appuser/.local/bin:${PATH}"
 
-# Copy code
-COPY . .
+# Cài PyTorch CPU-only phiên bản 2.1.0
+RUN pip install --no-cache-dir torch==2.1.0+cpu --index-url https://download.pytorch.org/whl/cpu
 
-# Tạo thư mục uploads
-RUN mkdir -p data/uploads && chmod 777 data/uploads
+# Copy requirements và cài đặt
+COPY --chown=appuser:appuser requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy toàn bộ code vào container
+COPY --chown=appuser:appuser . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

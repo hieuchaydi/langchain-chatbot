@@ -99,10 +99,18 @@ function renderFileList() {
 uploadBtn.addEventListener('click', async () => {
     if (selectedFiles.length === 0) return;
 
+    // NOTE: Đo chính xác thời gian + dung lượng người dùng thực sự upload
+    const uploadStartTime = Date.now();                                      // Thời điểm client bắt đầu gửi
+    const totalClientSize = selectedFiles.reduce((sum, f) => sum + f.size, 0); // Tổng byte thực tế
+
     const formData = new FormData();
     selectedFiles.forEach(file => formData.append("files", file));
 
-    status.innerHTML = `<div class="info-box">Đang upload... Đợi tí nha đại ca!</div>`;
+    // Gửi thêm thông tin để backend tính tốc độ thật
+    formData.append("client_start_time", uploadStartTime);   // ms
+    formData.append("client_total_size", totalClientSize);   // bytes
+
+    status.innerHTML = `<div class="info-box">Đang upload... Đợi tí nha!</div>`;
     uploadBtn.disabled = true;
 
     try {
@@ -112,17 +120,21 @@ uploadBtn.addEventListener('click', async () => {
         });
         const result = await response.json();
 
-        if (result.status === "success") {
-            status.innerHTML = `<div class="info-box success">
-                UPLOAD THÀNH CÔNG ${result.added} FILE! Bot thông minh hơn rồi đại ca ơi!
-            </div>`;
-            selectedFiles = [];
-            renderFileList();
-            uploadBtn.disabled = true;
-        }
+        // Hiển thị tốc độ thực tế cho người dùng (nếu backend trả về)
+        const speedText = result.real_speed 
+            ? ` • Tốc độ thực tế: ${result.real_speed} MB/s` 
+            : "";
+
+        status.innerHTML = `<div class="info-box success">
+            UPLOAD THÀNH CÔNG! ${speedText}
+        </div>`;
+
+        selectedFiles = [];
+        renderFileList();
+        uploadBtn.disabled = true;
     } catch (err) {
         console.error(err);
-        status.innerHTML = `<div class="info-box error">Lỗi mạng rồi đại ca! Thử lại đi!</div>`;
+        status.innerHTML = `<div class="info-box error">Lỗi mạng!</div>`;
         uploadBtn.disabled = false;
     }
 });
@@ -170,35 +182,5 @@ fileInput.addEventListener('change', () => {
 });
 </script>
 
-<style>
-.loader-page { max-width: 900px; margin: 2rem auto; padding: 0 1rem; text-align: center; }
-.drop-zone {
-    border: 4px dashed #333; border-radius: 20px; padding: 3rem; cursor: pointer;
-    transition: all 0.3s; background: #1a1a2e; margin: 2rem 0;
-}
-.drop-zone:hover { border-color: #4ecdc4; }
-.file-preview { margin: 2rem 0; text-align: left; background: #1a1a2e; padding: 1.5rem; border-radius: 12px; }
-.preview-header { font-weight: bold; color: #4ecdc4; margin-bottom: 1rem; }
-.preview-item { padding: 0.5rem 0; color: #a29bfe; display: flex; justify-content: space-between; }
 
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 700px; margin: 3rem auto; }
-.setting-item label { display: block; font-size: 1.3rem; margin-bottom: 0.5rem; color: #fff; }
-.setting-item input[type=range] { width: 100%; }
-
-.action-buttons { margin: 3rem 0; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap; }
-.btn-large { padding: 1.2rem 3rem; font-size: 1.3rem; border-radius: 50px; border: none; cursor: pointer; }
-.teal { background: #4ecdc4; color: #0f0f1a; }
-.red { background: #ff4757; color: white; }
-
-.status-box { min-height: 60px; margin: 2rem 0; }
-.info-box { padding: 1.2rem 2rem; border-radius: 12px; display: inline-block; font-weight: bold; }
-.success { background: #1a3a2a; color: #4ade80; border: 1px solid #4ade80; }
-.error { background: #3a1a1a; color: #ff6b6b; border: 1px solid #ff6b6b; }
-
-.nav-buttons a { 
-    display: inline-block; margin: 1rem; padding: 1rem 2.5rem; 
-    background: #6c5ce7; color: white; border-radius: 50px; text-decoration: none; font-weight: bold;
-}
-.nav-buttons a.purple { background: #a29bfe; }
-</style>
 {% endblock %}

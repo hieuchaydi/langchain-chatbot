@@ -1,7 +1,50 @@
+# --- Environment & Secret files ---
 .env
 .env.*
+*.env
+secrets.json
+
+# --- Python & Virtual Environment ---
 venv/
 .venv/
 ENV/
 env/
-*.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# --- Project Data & Storage (RAG Core) ---
+data/
+vectorstore/
+chroma_db/
+vector_db/
+*.sqlite
+*.db
+
+# --- Models & Heavy Files ---
+models/
+embedding_model/
+*.bin
+*.onnx
+*.pth
+*.h5
+*.pkl
+
+# --- Logs & Monitoring ---
+logs/
+*.log
+data/api.log
+
+# --- Docker & DevOps ---
+.docker/
+docker-compose.override.yml
+.DS_Store
+
+# --- Version Control & Archives ---
+.git
+.gitignore
+*.tar
+*.gz
+*.zip

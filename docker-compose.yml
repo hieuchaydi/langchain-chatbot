@@ -1,15 +1,38 @@
-# docker-compose.yml
-version: '3.8'
+version: '3.9'
 
 services:
   bot:
     build: .
+    container_name: chat-bot-create-profile
+    restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data
+      - ./vectorstore:/app/vectorstore
       - ./templates:/app/templates
       - ./static:/app/static
+      - ./config:/app/config
+      - ./middleware:/app/middleware
+      - ./routes:/app/routes
+      - ./models:/app/models
+      - ./services:/app/services
+      - ./log:/app/log
+      - ./controllers:/app/controllers
     environment:
       - PYTHONUNBUFFERED=1
-    restart: unless-stopped
+      - PORT=8000
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

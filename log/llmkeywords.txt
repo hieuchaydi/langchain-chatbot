@@ -1,0 +1,27 @@
+2025-12-17 11:10:13,112 | session=session_1765937911353_ofrygaalq | keywords=xinnnnl | message=
+2025-12-17 11:11:21,676 | session=session_1765937911353_ofrygaalq | keywords=xin, chào | message=
+2025-12-17 11:11:47,339 | session=session_1765937911353_ofrygaalq | keywords=what, hidemium, api | message=
+2025-12-17 11:12:53,453 | session=session_1765937911353_ofrygaalq | keywords=làm, tạo, được, script | message=
+2025-12-17 11:14:30,311 | session=session_1765937911353_ofrygaalq | keywords=giới, thiệu, công, của | message=
+2025-12-17 11:24:53,659 | session=session_1765937911353_ofrygaalq | keywords=xin, chào | user=xin chào
+2025-12-17 11:25:28,393 | session=session_1765937911353_ofrygaalq | keywords=giới, thiệu, công, hachitech, slution | user=giới thiệu về công ty hachitech slution đi
+2025-12-17 11:55:20,236 | session=session_1765937911353_ofrygaalq | keywords=api, của, hidemium | user=api của hidemium là gì
+2025-12-17 12:00:23,812 | session=session_1765937911353_ofrygaalq | keywords=giới, thiệu, công | user=giới thiệu về công ty bạn đi
+2025-12-18 09:32:50,189 | session=session_1765937911353_ofrygaalq | keywords=xin, chào, thể | user=Xin chào, bạn có thể giúp gì cho tôi?
+2025-12-18 14:09:32,588 | session=sess_1766041298290_tg8d3xakp | keywords=giới, thiệu, công | user=giới thiệu về công ty bạn đi
+2025-12-18 15:08:08,160 | session=sess_1766044069546_4mquxyftp | keywords=giới, thiệu, công | user=giới thiệu về công ty bạn đi
+2025-12-18 15:08:49,642 | session=sess_1766044069546_4mquxyftp | keywords=cách, tạo, lịch, trình, chạy, script | user=CÁCH TẠO LỊCH TRÌNH CHẠY SCRIPT ?
+2025-12-18 15:18:26,055 | session=sess_1766044069546_4mquxyftp | keywords=cách, tạo, lịch, trình, chạy, script | user=CÁCH TẠO LỊCH TRÌNH CHẠY SCRIPT ?
+2025-12-18 16:45:26,791 | session=sess_1766051123341_rbav3h0ah | keywords=cách, tạo, lịch, trình, chạy, script | user=CÁCH TẠO LỊCH TRÌNH CHẠY SCRIPT ?
+2025-12-18 17:16:59,142 | session=sess_1766051123341_rbav3h0ah | keywords=cách, tạo, lịch, trình, chạy, script | user=CÁCH TẠO LỊCH TRÌNH CHẠY SCRIPT ?
+2025-12-18 17:29:16,313 | session=sess_1766051123341_rbav3h0ah | keywords=cách, tạo, lịch, trình, chạy, script | user=CÁCH TẠO LỊCH TRÌNH CHẠY SCRIPT ?
+2025-12-18 17:29:21,026 | session=sess_1766051123341_rbav3h0ah | keywords=cách, tạo, lịch, trình, chạy, script | user=CÁCH TẠO LỊCH TRÌNH CHẠY SCRIPT ?
+2025-12-18 22:56:17,186 | session=sess_1766073240613_2b0cvn84b | keywords=what, hidemium, api | user=what is Hidemium api?
+2025-12-18 23:03:07,905 | session=sess_1766073240613_2b0cvn84b | keywords=what, hidemium, api | user=what is Hidemium api?
+2025-12-18 23:09:40,416 | session=sess_1766073240613_2b0cvn84b | keywords=what, hidemium, api | user=what is Hidemium api?
+2025-12-18 23:22:44,823 | session=sess_1766073240613_2b0cvn84b | keywords=what, hidemium, api | user=what is Hidemium api?
+2025-12-18 23:23:40,164 | session=sess_1766073240613_2b0cvn84b | keywords=what, hidemium, api | user=what is Hidemium api?
+2025-12-18 23:24:35,758 | session=sess_1766073240613_2b0cvn84b | keywords=cách, dùng, custom, nodes, của, hidemium | user=CÁCH DÙNG CUSTOM NODES của Hidemium là gì ?
+2025-12-18 23:25:04,384 | session=sess_1766075094080_4bw1t3jrw | keywords=api, của, hidemium | user=api của Hidemium là gì?
+2025-12-19 00:31:05,382 | session=sess_1766075094080_4bw1t3jrw | keywords=sai, rồi, api, của, hidemium, igf | user=sai rồi api của hidemium là igf
+2025-12-19 00:32:53,187 | session=sess_1766075094080_4bw1t3jrw | keywords=sai, rồi, api, hidemium, xem | user=sai rồi api hidemium có mà bạn xem kĩ đi

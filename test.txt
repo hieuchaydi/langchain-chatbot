@@ -1,0 +1,580 @@
+from typing import Dict, Any, List, Optional
+"""
+Chat Service Module
+
+ChatService v4.4.3 (Token-Optimized CSKH)
+- Không gọi Gemini cho:
+  - social
+  - small talk
+  - deny
+  - product inquiry
+  - quick reply
+- Gemini chỉ là fallback classifier
+- Giữ nguyên:
+  - CSKH routing
+  - Hidemium priority
+  - query expansion
+  - multi-language
+  - deny + escalation
+"""
+
+import asyncio
+import logging
+import os
+import re
+
+from services.intent_registry import intent_registry
+from config.quick_reply import QuickReplyHandler
+from models.vector_store import VectorStoreManager, SESSION_MEMORY
+from models.db import save_message
+from middleware.badword_filter import contains_swear, get_swear_response
+from models.gemini_analyzer import analyze_question
+
+
+LOG_DIR = "log"
+os.makedirs(LOG_DIR, exist_ok=True)
+
+pipeline_logger = logging.getLogger("chat_pipeline")
+pipeline_logger.setLevel(logging.INFO)
+pipeline_logger.propagate = False
+
+if not pipeline_logger.handlers:
+    handler = logging.FileHandler(
+        os.path.join(LOG_DIR, "chat_pipeline.log"),
+        encoding="utf-8"
+    )
+    formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)s | %(message)s"
+    )
+    handler.setFormatter(formatter)
+    pipeline_logger.addHandler(handler)
+
+
+def log_flow(step: str, data: Optional[Dict[str, Any]] = None):
+    if data:
+        pipeline_logger.info(f"[FLOW] {step} | {data}")
+    else:
+        pipeline_logger.info(f"[FLOW] {step}")
+
+
+# =========================
+# SOCIAL / SMALL TALK
+# =========================
+
+SOCIAL_RESPONSES = {
+    "vi": {
+        "greeting": "Chào bạn 👋",
+        "thanks": "Không có gì, rất vui được giúp bạn!",
+        "goodbye": "Tạm biệt nhé 👋",
+        "introduction": "Mình là trợ lý AI hỗ trợ khách hàng, rất vui được hỗ trợ bạn ạ.",
+        "chitchat": "Chào bạn! Mình có thể hỗ trợ bạn về vấn đề gì hôm nay?",
+        "who_are_you": "Mình là trợ lý AI hỗ trợ khách hàng của công ty ạ. Rất vui được gặp bạn!",
+        "what_doing": "Mình đang ở đây chờ hỗ trợ bạn nè 😄 Bạn cần giúp gì hôm nay?",
+    },
+    "en": {
+        "greeting": "Hello 👋",
+        "thanks": "You're welcome!",
+        "goodbye": "Goodbye 👋",
+        "introduction": "I'm an AI customer support assistant designed to help you.",
+        "chitchat": "Hi there! How can I help you today?",
+        "who_are_you": "I'm your AI customer support assistant. Nice to meet you!",
+        "what_doing": "Just here waiting to assist you 😄 What's on your mind?",
+    },
+    "zh": {
+        "greeting": "你好 👋",
+        "thanks": "不客气！",
+        "goodbye": "再见 👋",
+        "introduction": "我是AI客户支持助手，很高兴为您服务。",
+        "chitchat": "你好！今天我能帮您什么？",
+        "who_are_you": "我是您的AI客户支持助手，很高兴认识您！",
+        "what_doing": "我在这里等着帮您呢 😄 您有什么需要？",
+    },
+    "ru": {
+        "greeting": "Привет 👋",
+        "thanks": "Пожалуйста!",
+        "goodbye": "До свидания 👋",
+        "introduction": "Я AI-ассистент поддержки клиентов, рад вам помочь.",
+        "chitchat": "Привет! Чем могу помочь сегодня?",
+        "who_are_you": "Я ваш AI-ассистент поддержки. Приятно познакомиться!",
+        "what_doing": "Я здесь, чтобы помочь вам 😄 О чем думаете?",
+    },
+}
+
+
+SOCIAL_STARTERS = {
+    "vi": [
+        "hi", "hello", "hey", "xin chào", "chào", "chào bạn", "chào anh", "chào chị",
+        "bạn là ai", "bạn tên gì", "ai vậy",
+        "đang làm gì", "làm gì đấy", "đang làm gì thế",
+        "chào buổi sáng", "chào buổi chiều", "chào buổi tối",
+    ],
+    "en": [
+        "hi", "hello", "hey",
+        "who are you", "what's your name",
+        "what are you doing", "how are you",
+        "good morning", "good afternoon", "good evening",
+    ],
+    "zh": [
+        "你好", "嗨", "你是谁", "你叫什么名字",
+        "你在做什么", "你好吗",
+    ],
+    "ru": [
+        "привет", "кто ты", "как тебя зовут",
+        "чем занимаешься", "как дела",
+    ],
+}
+
+
+SMALL_TALK_PATTERNS = {
+    "vi": {
+        r"(bạn|em|mình).*(khỏe|ổn|thế nào)": "Mình khỏe lắm ạ, cảm ơn bạn hỏi! Còn bạn thì sao? 😊",
+        r"(đang làm gì|đang làm)": "Đang chờ hỗ trợ bạn đây ạ 😄 Bạn cần giúp gì nào?",
+    },
+    "en": {
+        r"(you).*(good|fine|how)": "I'm doing great, thanks! How about you? 😊",
+        r"(what.*doing)": "Just here to help you out 😄 What's up?",
+    },
+    "zh": {
+        r"(你).*(好|怎么样)": "我很好，谢谢！您呢？ 😊",
+        r"(在做什么)": "就在这里帮您 😄 您需要什么帮助？",
+    },
+    "ru": {
+        r"(ты).*(хорошо|как)": "У меня все хорошо, спасибо! А у вас? 😊",
+        r"(чем.*занимаешься)": "Просто здесь, чтобы помочь вам 😄 Что у вас?",
+    },
+}
+
+
+DENY_KEYWORDS = {
+    "vi": ["sai rồi", "không đúng", "không phải", "tôi không muốn", "không phải vậy", "lại sai"],
+    "en": ["not correct", "wrong", "that's wrong", "incorrect", "not right", "not what i want", "nope", "that's not it"],
+    "zh": ["不对", "错了", "不是这样"],
+    "ru": ["неправильно", "не то", "ошибка"],
+}
+
+
+PRODUCT_KEYWORDS = {
+    "vi": [
+        "hidemium", "api hidemium", "hidemium api", "hidemium là gì",
+        "dịch vụ hidemium", "hidemium proxy", "ẩn danh hidemium",
+    ],
+    "en": [
+        "hidemium", "hidemium api", "what is hidemium",
+        "hidemium proxy", "tell me about hidemium",
+    ],
+    "zh": ["hidemium", "hidemium api"],
+    "ru": ["hidemium", "hidemium api"],
+}
+
+
+def detect_language(text: str) -> str:
+    if re.search(r'[\u4e00-\u9fff]', text):
+        return "zh"
+    if re.search(r'[\u0400-\u04ff]', text):
+        return "ru"
+    try:
+        text.encode("ascii")
+        return "en"
+    except UnicodeEncodeError:
+        return "vi"
+
+
+def translate_to_vi(text: str, src_lang: str) -> str:
+    if src_lang == "vi":
+        return text
+    return text
+
+
+def translate_from_vi(text: str, target_lang: str) -> str:
+    if target_lang == "vi":
+        return text
+    return text
+
+
+# =========================
+# RAG HELPERS
+# =========================
+
+def is_valid_chunk(text: str) -> bool:
+    text = text.strip()
+    if not text or text in {"--", "-", "..."}:
+        return False
+    if len(text) < 15:
+        return False
+    return True
+
+
+def build_answer_from_chunks(
+    docs: List[str],
+    query: Optional[str] = None,
+    max_chars: int = 800
+) -> str:
+    valid_docs = [d for d in docs if is_valid_chunk(d)]
+    if not valid_docs:
+        return ""
+
+    best_docs = valid_docs
+    if query:
+        q = query.lower()
+        matched = [d for d in valid_docs if q in d.lower()]
+        if matched:
+            best_docs = matched
+
+    answer_parts = []
+    current_length = 0
+
+    for text in best_docs:
+        match = re.search(r"\*\*?A:\*\*?\s*(.+)", text, re.DOTALL | re.IGNORECASE)
+        extracted = match.group(1).strip() if match else text.strip()
+
+        extracted = re.sub(r'^[-\*]\s*', '', extracted)
+        extracted = re.sub(r'\s+', ' ', extracted)
+
+        if current_length + len(extracted) <= max_chars:
+            answer_parts.append(extracted)
+            current_length += len(extracted)
+        else:
+            break
+
+    return "\n".join(answer_parts)
+
+
+def wrap_cskh_answer(answer: str, lang: str) -> str:
+    if not answer:
+        return answer
+
+    suffixes = {
+        "vi": "Bạn cần hỗ trợ thêm gì không ạ? 😊",
+        "en": "Anything else I can help with? 😊",
+        "zh": "还有什么我能帮您的吗？ 😊",
+        "ru": "Чем еще могу помочь? 😊",
+    }
+
+    return f"{answer} {suffixes.get(lang, suffixes['en'])}"
+
+
+def build_alternative_answer(docs: List[str], lang: str) -> str:
+    prefixes = {
+        "vi": "Có thể mình đã hiểu chưa đúng trường hợp của bạn.\nTrong tài liệu hiện có, mình thấy các thông tin sau:\n",
+        "en": "Maybe I didn't understand your case correctly.\nIn the current documentation, I found the following:\n",
+        "zh": "可能我没完全理解您的情况。\n在现有文档中，我找到以下信息：\n",
+        "ru": "Возможно, я не совсем понял ваш случай.\nВ документации я нашел следующее:\n",
+    }
+
+    text = prefixes.get(lang, prefixes["en"])
+
+    for i, d in enumerate(docs[:3]):
+        summary_vi = build_answer_from_chunks([d])
+        summary = translate_from_vi(summary_vi, lang)
+        label = chr(65 + i)
+        text += f"• Trường hợp {label}: {summary}\n" if lang == "vi" else f"• Case {label}: {summary}\n"
+
+    questions = {
+        "vi": "\nBạn đang quan tâm trường hợp nào để mình hỗ trợ chính xác hơn nhé?",
+        "en": "\nWhich case are you referring to so I can assist more accurately?",
+        "zh": "\n您关心哪个情况，让我更准确地帮助您？",
+        "ru": "\nКакой случай вас интересует, чтобы я мог помочь точнее?",
+    }
+
+    text += questions.get(lang, questions["en"])
+    return text
+
+
+# =========================
+# CHAT SERVICE
+# =========================
+
+class ChatService:
+
+    def __init__(self):
+        self.vector = VectorStoreManager()
+        self.quick_reply = QuickReplyHandler()
+
+    async def process_chat_message(
+        self,
+        message: str,
+        session_id: str = "default"
+    ) -> Dict[str, Any]:
+
+        pipeline_logger.info("=" * 80)
+        pipeline_logger.info(f"[INPUT] {message}")
+
+        message = message.strip()
+        if not message:
+            return {"response": "Please say something 😅"}
+
+        save_message("user", message, session_id=session_id)
+
+        session = SESSION_MEMORY.setdefault(session_id, {})
+
+        user_lang = detect_language(message)
+        support_state = session.setdefault("support_state", {
+            "phase": "idle",
+            "last_query": None,
+            "last_answer": None,
+            "deny_count": 0,
+            "language": user_lang,
+            "escalated": False
+        })
+
+        support_state["language"] = user_lang
+
+        msg_lc = message.lower()
+
+        # RESET deny_count nếu user KHÔNG còn phủ định
+        deny_list = DENY_KEYWORDS.get(user_lang, [])
+        if support_state["deny_count"] > 0 and not any(x in msg_lc for x in deny_list):
+            support_state["deny_count"] = 0
+
+        # 1) DENY (PHẢI CHẠY TRƯỚC PRODUCT PRIORITY)
+        if any(x in msg_lc for x in deny_list):
+            resp = await self.handle_deny(support_state)
+            if support_state["deny_count"] >= 3:
+                support_state["escalated"] = True
+            save_message("bot", resp, session_id)
+            log_flow("handling_deny", {"deny_count": support_state["deny_count"]})
+            return {"response": resp, "mode": "cskh_deny"}
+
+        # 2) PRODUCT PRIORITY (guarded)
+        product_keywords_all = PRODUCT_KEYWORDS.get(user_lang, []) + PRODUCT_KEYWORDS.get("en", [])
+        if any(kw in msg_lc for kw in product_keywords_all) and support_state["deny_count"] == 0:
+            log_flow("route_product_inquiry", {"query": message, "lang": user_lang})
+            return await self.handle_knowledge_flow(message, support_state, session_id)
+
+        # 3) SMALL TALK
+        for pattern, reply in SMALL_TALK_PATTERNS.get(user_lang, {}).items():
+            if re.search(pattern, msg_lc):
+                save_message("bot", reply, session_id)
+                log_flow("small_talk_hit", {"pattern": pattern})
+                return {"response": reply, "mode": "small_talk"}
+
+        # 4) SOCIAL HARD MATCH (WORD BOUNDARY FIX)
+        starters = SOCIAL_STARTERS.get(user_lang, [])
+        for x in starters:
+            pattern = r"\b" + re.escape(x) + r"\b"
+            if re.search(pattern, msg_lc):
+                responses = SOCIAL_RESPONSES.get(user_lang, SOCIAL_RESPONSES["en"])
+
+                if any(y in msg_lc for y in ["là ai", "who are you"]):
+                    answer = responses["who_are_you"]
+                elif any(y in msg_lc for y in ["làm gì", "doing"]):
+                    answer = responses["what_doing"]
+                else:
+                    answer = responses["chitchat"]
+
+                save_message("bot", answer, session_id)
+                log_flow("route_cskh_social_hard", {"answer": answer})
+                return {"response": answer, "mode": "social"}
+
+        # 5) BAD WORD
+        if contains_swear(message):
+            resp = get_swear_response()
+            save_message("bot", resp, session_id)
+            return {"response": resp}
+
+        # 6) QUICK REPLY
+        if len(message) <= 8:
+            qr = self.quick_reply.get_quick_response(message)
+            if qr:
+                save_message("bot", qr, session_id)
+                return {"response": qr, "mode": "quick_reply"}
+
+        # ==================================================
+        # 7) GEMINI FALLBACK CLASSIFIER (GATED)
+        # ==================================================
+        intent_type = "knowledge"
+        intent = "unknown"
+
+        log_flow("intent_llm_probe", {"message": message})
+
+        try:
+            analysis = await asyncio.to_thread(analyze_question, message)
+            intent_type = analysis.get("type", "knowledge")
+            intent = analysis.get("intent", "unknown")
+            log_flow("intent_detected", {"type": intent_type, "intent": intent})
+        except Exception as e:
+            log_flow("intent_llm_error", {"error": str(e)})
+
+        # 8) SOCIAL FALLBACK
+        if intent_type == "social":
+            responses = SOCIAL_RESPONSES.get(user_lang, SOCIAL_RESPONSES["en"])
+            answer = responses.get("chitchat", responses["chitchat"])
+            save_message("bot", answer, session_id)
+            return {"response": answer, "mode": "social"}
+
+        # 9) ACTION INTENT
+        handler_cls = intent_registry.get(intent_type, intent)
+        if handler_cls:
+            handler = handler_cls()
+            resp = await handler.handle(session)
+            return resp
+
+        # 10) DEFAULT KNOWLEDGE
+        return await self.handle_knowledge_flow(message, support_state, session_id)
+
+    async def handle_knowledge_flow(
+        self,
+        message: str,
+        support_state: Dict[str, Any],
+        session_id: str
+    ) -> Dict[str, Any]:
+
+        support_state["phase"] = "answering"
+
+        user_lang = support_state["language"]
+        query_vi = translate_to_vi(message, user_lang)
+
+        # reset deny_count CHỈ khi user hỏi câu MỚI
+        if support_state.get("last_query") and support_state["last_query"] != query_vi:
+            support_state["deny_count"] = 0
+
+        support_state["last_query"] = query_vi
+
+        docs = []
+        if "hidemium" in query_vi.lower():
+            expanded_queries = [
+                query_vi,
+                "Hidemium API là gì",
+                "Hidemium là gì",
+                "dịch vụ Hidemium API",
+                "Hidemium proxy anonymous browsing",
+                "tính năng Hidemium API",
+                "cách sử dụng Hidemium",
+            ]
+
+            all_docs = []
+            for q in expanded_queries:
+                d, _, _ = self.vector.query_documents(
+                    query=q, user_id=session_id, n_results=15
+                )
+                all_docs.extend(d)
+
+            seen = set()
+            docs = [x for x in all_docs if not (x in seen or seen.add(x))][:40]
+
+            log_flow("query_expansion", {
+                "original": query_vi,
+                "expanded_count": len(expanded_queries)
+            })
+        else:
+            docs, _, _ = self.vector.query_documents(
+                query=query_vi, user_id=session_id, n_results=20
+            )
+
+        answer_vi = build_answer_from_chunks(docs, query_vi)
+
+        if not answer_vi or len(answer_vi.strip()) < 30:
+            if "hidemium" in query_vi.lower():
+                answer_vi = (
+                    "Hidemium API là bộ API cho phép bạn tạo, quản lý và khởi chạy "
+                    "các browser profile Hidemium từ tool bên ngoài. "
+                    "API thường dùng để tích hợp với Puppeteer, Playwright "
+                    "hoặc automation framework riêng.\n\n"
+                    "Bạn đang muốn:\n"
+                    "• Điều khiển profile qua API?\n"
+                    "• Kết nối với Puppeteer/Playwright?\n"
+                    "• Hay build tool riêng dùng profile Hidemium?"
+                )
+            else:
+                answer_vi = (
+                    "Mình chưa tìm thấy thông tin phù hợp trong tài liệu hiện tại. "
+                    "Bạn có thể mô tả chi tiết hơn được không ạ? 😊"
+                )
+
+        support_state["last_answer"] = answer_vi
+
+        answer = translate_from_vi(answer_vi, user_lang)
+        answer = wrap_cskh_answer(answer, user_lang)
+
+        log_flow("rag_response", {"answer_preview": answer[:150]})
+        save_message("bot", answer, session_id)
+
+        return {"response": answer, "mode": "knowledge"}
+
+    async def handle_deny(self, support_state: Dict[str, Any]) -> str:
+
+        support_state["phase"] = "handling_deny"
+        support_state["deny_count"] += 1
+
+        last_query_vi = support_state.get("last_query")
+        lang = support_state["language"]
+
+        # LẦN 3 → escalation
+        if support_state["deny_count"] >= 3:
+            escalations = {
+                "vi": (
+                    "Mình xin lỗi vì chưa hỗ trợ đúng. "
+                    "Mình sẽ chuyển bạn sang bộ phận CSKH nhé. "
+                    "Bạn để lại thông tin để bên mình liên hệ hỗ trợ ạ 😊"
+                ),
+                "en": (
+                    "Sorry I couldn't get it right yet. "
+                    "I'll escalate to our support team. "
+                    "Please leave your details 😊"
+                ),
+            }
+            return escalations.get(lang, escalations["en"])
+
+        # LẦN 2 → ép cases
+        if support_state["deny_count"] == 2 and last_query_vi:
+            rephrased = last_query_vi + " các trường hợp"
+            docs, _, _ = self.vector.query_documents(
+                query=rephrased, user_id="deny", n_results=50
+            )
+
+            # fallback cứng nếu không có doc
+            if not docs:
+                hard_cases = {
+                    "vi": [
+                        "Điều khiển profile từ tool khác qua API",
+                        "Kết nối profile với Puppeteer / Playwright",
+                        "Xây tool riêng để quản lý profile",
+                    ],
+                    "en": [
+                        "Control profile from another tool via API",
+                        "Connect profile with Puppeteer / Playwright",
+                        "Build your own tool to manage profiles",
+                    ],
+                }
+
+                cases = hard_cases.get(lang, hard_cases["en"])
+
+                text = {
+                    "vi": "Có thể bạn đang nói tới một trong các trường hợp sau:\n",
+                    "en": "You might be referring to one of these cases:\n",
+                }.get(lang, "You might be referring to one of these cases:\n")
+
+                for i, c in enumerate(cases):
+                    label = chr(65 + i)
+                    text += (
+                        f"• Trường hợp {label}: {c}\n"
+                        if lang == "vi"
+                        else f"• Case {label}: {c}\n"
+                    )
+
+                text += {
+                    "vi": "\nBạn đang quan tâm trường hợp nào?",
+                    "en": "\nWhich case are you referring to?",
+                }.get(lang, "\nWhich case are you referring to?")
+
+                return text
+
+            return build_alternative_answer(docs, lang)
+
+        # LẦN 1 → hỏi rõ hơn
+        if not last_query_vi:
+            return {
+                "vi": "Mình chưa rõ bạn đang phủ định phần nào. Bạn có thể nói rõ hơn không ạ? 😊",
+                "en": "I'm not sure what part you're disagreeing with. Could you clarify? 😊",
+            }.get(lang, "I'm not sure what part you're disagreeing with. Could you clarify? 😊")
+
+        return {
+            "vi": "Có thể mình chưa hiểu đúng. Bạn có thể nói rõ hơn không ạ? 😊",
+            "en": "Maybe I misunderstood. Could you clarify? 😊",
+        }.get(lang, "Maybe I misunderstood. Could you clarify? 😊")
+
+
+_chat_service = ChatService()
+
+async def process_chat_message(message: str, session_id: str = "default"):
+    return await _chat_service.process_chat_message(message, session_id)

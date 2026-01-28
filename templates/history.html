@@ -1,397 +1,100 @@
 {% extends "base.html" %}
-{% block title %}LỊCH SỬ CHÉM GIÓ CỦA ngươi{% endblock %}
+{% block title %}Lịch sử trò chuyện{% endblock %}
 
 {% block content %}
-<div class="history-page">
+<div class="history-wrapper">
 
-    <!-- Header -->
-    <div class="page-header">
-        <h1>LỊCH SỬ trò chuyện</h1>
-        <p>Tất tần tật những lần ngươi hành hạ</p>
-    </div>
+    <!-- HEADER -->
+    <header class="history-header">
+        <h1>📜 Lịch sử trò chuyện</h1>
+        <p>Theo dõi toàn bộ hội thoại giữa bạn và Hidemium AI (theo từng session)</p>
+    </header>
 
-    <div class="history-grid">
+    <div class="history-layout">
 
-        <!-- CỘT TRÁI: LỊCH SỬ CHAT -->
-        <div class="panel chat-panel">
-            <div class="panel-header">
-                <h2>Lịch Sử Chat</h2>
-                <div class="stats">
-                    <span class="badge">{{ history|length }} tin trang này</span>
-                    <span class="page-info">Trang {{ page }} / {{ total_pages }}</span>
-                </div>
+        <!-- CHAT HISTORY -->
+        <section class="card chat-history">
+            <div class="card-header">
+                <h2>💬 Hội thoại</h2>
+                <span class="meta">{{ history|length }} tin • Trang {{ page }}/{{ total_pages }}</span>
             </div>
 
-            <div class="messages-container">
+            <div class="messages">
                 {% if history|length == 0 %}
-                <div class="empty-state">
-                    <p>ngươi đùa ta à</p>
-                    <a href="/chat" class="btn-primary">Bắt đầu chém gió ngay!</a>
-                </div>
+                    <div class="empty">
+                        <p>Chưa có cuộc trò chuyện nào</p>
+                        <a href="/chat" class="btn primary">Bắt đầu chat</a>
+                    </div>
                 {% else %}
-                {% for msg in history %}
-                <div class="message {{ 'user' if msg.role == 'user' else 'bot' }}">
-                    <div class="avatar">
-                        {{ 'ĐC' if msg.role == 'user' else 'BL' }}
-                    </div>
-                    <div class="bubble">
-                        <div class="sender">
-                            <strong>{{ 'Đại Ca' if msg.role == 'user' else 'Bot Lầy' }}</strong>
-                            <span class="time">{{ msg.time }}</span>
+                    {% for msg in history %}
+                    <div class="msg {{ msg.role }}">
+                        <div class="avatar">
+                            {{ "👤" if msg.role == "user" else "🤖" }}
                         </div>
-                        <div class="text">
-                            {{ msg.content | replace("\n", "<br>") | safe }}
+                        <div class="bubble">
+                            <div class="bubble-header">
+                                <strong>{{ "Bạn" if msg.role == "user" else "Hidemium AI" }}</strong>
+                                <span>{{ msg.time }}</span>
+                            </div>
+                            <div class="bubble-body">
+                                {{ msg.content | replace("\n", "<br>") | safe }}
+                            </div>
                         </div>
                     </div>
-                </div>
-                {% endfor %}
+                    {% endfor %}
                 {% endif %}
             </div>
 
-            <!-- Phân trang -->
             {% if total_pages > 1 %}
             <div class="pagination">
                 {% if has_prev %}
-                <a href="?page={{ page - 1 }}" class="page-link">Trước</a>
+                    <a href="?page={{ page - 1 }}">← Trước</a>
                 {% endif %}
-
-                {% for p in range(1, total_pages + 1) %}
-                    {% if p == page %}
-                    <span class="page-link current">{{ p }}</span>
-                    {% else %}
-                    <a href="?page={{ p }}" class="page-link">{{ p }}</a>
-                    {% endif %}
-                {% endfor %}
-
+                <span>Trang {{ page }}</span>
                 {% if has_next %}
-                <a href="?page={{ page + 1 }}" class="page-link">Sau</a>
+                    <a href="?page={{ page + 1 }}">Sau →</a>
                 {% endif %}
             </div>
             {% endif %}
-        </div>
+        </section>
 
-        <!-- CỘT PHẢI: FILE ĐÃ NẠP -->
-        <div class="panel files-panel">
-            <div class="panel-header">
-                <h2>File .md Đã Nạp</h2>
-                <a href="/data-loader" class="btn-small">+ Upload thêm</a>
+        <!-- FILE PANEL -->
+        <aside class="card files-panel">
+            <div class="card-header">
+                <h2>📂 Tài liệu AI</h2>
+                <a href="/data-loader" class="btn ghost">Upload</a>
             </div>
 
-            <div class="files-container" id="files-container">
-                {% if uploaded_files|length == 0 %}
-                <div class="empty-state">
-                    <p>Chưa có file nào được nạp</p>
-                    <a href="/data-loader" class="btn-primary">Upload!</a>
+            {% if uploaded_files|length == 0 %}
+                <div class="empty small">
+                    <p>Chưa có file .md</p>
                 </div>
-                {% else %}
-                {% for f in uploaded_files %}
-                <div class="file-item">
-                    <div class="file-icon">MD</div>
-                    <div class="file-info">
-                        <div class="filename">{{ f.filename }}</div>
-                        <div class="upload-time">{{ f.time }}</div>
-                    </div>
-                    <form method="post" action="/delete-file" class="delete-form">
-                        <input type="hidden" name="filename" value="{{ f.filename }}">
-                        <button type="submit" class="btn-delete"
-                                onclick="return confirm('Xóa {{ f.filename }} thật hả đại ca? Bot sẽ quên sạch kiến thức đấy!')">
-                            XÓA
-                        </button>
-                    </form>
-                </div>
-                {% endfor %}
-                {% endif %}
-            </div>
-        </div>
+            {% else %}
+                <ul class="file-list">
+                    {% for f in uploaded_files %}
+                    <li class="file-item">
+                        <div>
+                            <strong>{{ f.filename }}</strong>
+                            <span>{{ f.time }}</span>
+                        </div>
+                        <form method="post" action="/delete-file">
+                            <input type="hidden" name="filename" value="{{ f.filename }}">
+                            <button class="icon danger" title="Xóa">🗑</button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </aside>
+
     </div>
 
-    <!-- Nút điều hướng dưới -->
-    <div class="bottom-actions">
-        <a href="/" class="nav-btn">Trang Chủ</a>
-        <a href="/chat" class="nav-btn primary">Chat Tiếp</a>
-        <a href="/vector-manager" class="nav-btn">Vector Store</a>
-        <a href="/data-loader" class="nav-btn">Nạp File</a>
+    <!-- FOOT ACTIONS -->
+    <div class="footer-actions">
+        <a href="/" class="btn ghost">Trang chủ</a>
+        <a href="/chat" class="btn primary">Chat tiếp</a>
+        <a href="/vector-manager" class="btn ghost">Vector Store</a>
     </div>
 </div>
 
-<style>
-/* Dùng 100% class đã có trong style.css của đại ca + bổ sung nhẹ */
-.history-page { padding: 2rem 1.5rem; max-width: 1700px; margin: 0 auto; }
-
-.page-header {
-    text-align: center;
-    margin-bottom: 3rem;
-}
-.page-header h1 {
-    font-size: 3.5rem;
-    font-weight: 700;
-    background: linear-gradient(90deg, #6e6fff, #ff6b9d);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin: 0;
-}
-.page-header p { color: #aaa; font-size: 1.3rem; margin-top: 0.8rem; }
-
-.history-grid {
-    display: grid;
-    grid-template-columns: 1fr 460px;
-    gap: 2rem;
-    margin-bottom: 4rem;
-}
-@media (max-width: 1200px) {
-    .history-grid { grid-template-columns: 1fr; }
-    .files-panel { max-width: 700px; margin: 0 auto; }
-}
-
-.panel {
-    background: var(--panel-bg, rgba(20,20,40,0.6));
-    border-radius: 20px;
-    border: 1px solid var(--border-color, rgba(110,111,255,0.3));
-    overflow: hidden;
-    backdrop-filter: blur(10px);
-}
-.panel-header {
-    background: var(--panel-header, rgba(30,30,60,0.8));
-    padding: 1.2rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border-color);
-}
-.panel-header h2 { margin: 0; color: #6e6fff; font-size: 1.6rem; }
-.stats { display: flex; gap: 1rem; align-items: center; font-size: 0.95rem; color: #ccc; }
-.badge { background: #ff6b9d; padding: 0.3rem 0.9rem; border-radius: 50px; font-weight: 600; }
-
-.messages-container, .files-container {
-    height: 68vh;
-    overflow-y: auto;
-    padding: 1.5rem;
-}
-.messages-container::-webkit-scrollbar, .files-container::-webkit-scrollbar {
-    width: 6px;
-}
-.messages-container::-webkit-scrollbar-thumb, .files-container::-webkit-scrollbar-thumb {
-    background: #6e6fff;
-    border-radius: 3px;
-}
-
-/* Tin nhắn */
-.message {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1.8rem;
-    animation: fadeIn 0.4s ease-out;
-}
-.message.user { flex-direction: row-reverse; }
-.avatar {
-    width: 44px; height: 44px; border-radius: 50%;
-    background: #6e6fff; color: white; font-weight: bold;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.1rem; flex-shrink: 0;
-}
-.message.user .avatar { background: #ff6b9d; }
-.bubble {
-    flex: 1;
-    max-width: 85%;
-}
-.sender {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 0.5rem; font-size: 0.95rem;
-}
-.sender strong { color: #6e6fff; }
-.message.user strong { color: #ff6b9d; }
-.time { color: #999; }
-.text {
-    background: rgba(40,40,80,0.7);
-    padding: 1.1rem 1.5rem;
-    border-radius: 18px;
-    line-height: 1.7;
-    border: 1px solid rgba(110,111,255,0.2);
-    word-wrapanyiwhere;
-}
-.message.user .text {
-    background: rgba(255,107,157,0.15);
-    border-color: rgba(255,107,157,0.4);
-}
-
-/* CSS cho phân trang với scroll ngang */
-.pagination {
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 1.5rem;
-    background: var(--panel-bg);
-    overflow-x: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #6e6fff rgba(30,30,60,0.5);
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    position: relative;
-}
-
-/* Tạo hiệu ứng mờ ở hai bên khi cuộn */
-.pagination::before,
-.pagination::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 40px;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.pagination::before {
-    left: 0;
-    background: linear-gradient(to right, var(--panel-bg) 30%, transparent);
-}
-
-.pagination::after {
-    right: 0;
-    background: linear-gradient(to left, var(--panel-bg) 30%, transparent);
-}
-
-/* Thanh scrollbar tùy chỉnh */
-.pagination::-webkit-scrollbar {
-    height: 6px;
-}
-
-.pagination::-webkit-scrollbar-track {
-    background: rgba(30,30,60,0.5);
-    border-radius: 3px;
-}
-
-.pagination::-webkit-scrollbar-thumb {
-    background: #6e6fff;
-    border-radius: 3px;
-}
-
-.pagination::-webkit-scrollbar-thumb:hover {
-    background: #8a8aff;
-}
-
-/* Đảm bảo các nút phân trang không bị co lại */
-.page-link {
-    padding: 0.6rem 1rem;
-    border-radius: 8px;
-    text-decoration: none;
-    background: rgba(110,111,255,0.3);
-    color: #ccc;
-    white-space: nowrap; /* Quan trọng: ngăn xuống dòng */
-    flex-shrink: 0; /* Quan trọng: không cho nút bị co lại */
-    transition: all 0.3s ease;
-}
-
-.page-link.current, .page-link:hover {
-    background: #6e6fff;
-    color: white;
-}
-
-/* Responsive cho mobile */
-@media (max-width: 768px) {
-    .pagination {
-        gap: 0.3rem;
-        padding: 1rem;
-    }
-    
-    .page-link {
-        padding: 0.5rem 0.8rem;
-        font-size: 0.9rem;
-    }
-    
-    .pagination::before,
-    .pagination::after {
-        width: 20px;
-    }
-}
-
-/* Hiệu ứng khi có thanh cuộn */
-.pagination.scrollable {
-    padding-bottom: 1rem; /* Thêm khoảng trống cho scrollbar */
-}
-
-/* Nút điều hướng đặc biệt (Trước/Sau) */
-.pagination .page-link:first-child,
-.pagination .page-link:last-child {
-    background: rgba(110,111,255,0.5);
-    font-weight: 600;
-}
-
-.pagination .page-link:first-child:hover,
-.pagination .page-link:last-child:hover {
-    background: #8a8aff;
-}
-
-/* Highlight trang hiện tại */
-.page-link.current {
-    box-shadow: 0 0 0 2px #6e6fff;
-    font-weight: 700;
-    transform: scale(1.05);
-}
-
-/* File list */
-.file-item {
-    display: flex; align-items: center; gap: 1rem;
-    padding: 1rem; background: rgba(40,40,80,0.5);
-    border-radius: 14px; margin-bottom: 0.8rem;
-    border: 1px solid rgba(110,111,255,0.2);
-}
-.file-item:hover { background: rgba(50,50,100,0.6); }
-.file-icon {
-    width: 48px; height: 48px; background: #6e6fff;
-    border-radius: 12px; display: flex; align-items: center;
-    justify-content: center; color: white; font-weight: bold;
-}
-.filename { font-weight: 600; color: #6e6fff; }
-.upload-time { font-size: 0.9rem; color: #999; }
-.delete-form { margin-left: auto; }
-.btn-delete {
-    background: #ff4757; color: white; border: none;
-    padding: 0.5rem 1rem; border-radius: 8px;
-    font-size: 0.9rem; cursor: pointer;
-}
-.btn-delete:hover { background: #c92a2a; }
-
-/* Phân trang & nút */
-.pagination {
-    display: flex; justify-content: center; gap: 0.8rem;
-    padding: 1.5rem; background: var(--panel-bg);
-}
-.page-link {
-    padding: 0.6rem 1rem; border-radius: 8px;
-    text-decoration: none; background: rgba(110,111,255,0.3);
-    color: #ccc;
-}
-.page-link.current, .page-link:hover {
-    background: #6e6fff; color: white;
-}
-
-.empty-state {
-    text-align: center; padding: 6rem 2rem; color: #777;
-}
-.empty-state p { font-size: 1.4rem; margin-bottom: 1.5rem; }
-
-.bottom-actions {
-    display: flex; justify-content: center; gap: 1.5rem;
-    flex-wrap: wrap; padding: 2rem 0;
-}
-</style>
-
-<script>
-// Auto refresh nhẹ phần file mỗi 6s
-setInterval(() => {
-    fetch(location.href)
-        .then(r => r.text())
-        .then(html => {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const newFiles = doc.getElementById('files-container');
-            if (newFiles && newFiles.innerHTML !== document.getElementById('files-container').innerHTML) {
-                document.getElementById('files-container').innerHTML = newFiles.innerHTML;
-            }
-        });
-}, 6000);
-</script>
 {% endblock %}
